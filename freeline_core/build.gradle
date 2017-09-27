@@ -5,6 +5,9 @@ task packageFreeLinePy(type: Zip) {
     from("./") {
         into "freeline/freeline_core"
     }
+    from("../release-tools") {
+        into "freeline/release-tools"
+    }
     include "**.py"
     archiveName 'freeline.zip'
     destinationDir = file("./build")
