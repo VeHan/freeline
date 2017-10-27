@@ -6,14 +6,15 @@ import groovy.json.JsonBuilder
 import org.gradle.api.Project
 
 import java.security.InvalidParameterException
+
 /**
  * Created by huangyong on 16/7/19.
  */
 class FreelineInitializer {
 
-    public static void initFreeline(Project project) {
+    public static void initFreeline(Project project, String version) {
         println "Freeline initial process start..."
-        FreelineDownloader.execute(project)
+        FreelineDownloader.execute(project, version)
         generateProjectDescription(project)
     }
 
@@ -53,8 +54,10 @@ class FreelineInitializer {
         projectDescription.build_tools_directory = FreelineUtils.joinPath(projectDescription.sdk_directory, 'build-tools', projectDescription.build_tools_version)
         projectDescription.compile_sdk_version = project.android.compileSdkVersion.toString()
         projectDescription.compile_sdk_directory = FreelineUtils.joinPath(projectDescription.sdk_directory, 'platforms', projectDescription.compile_sdk_version)
-        projectDescription.package = packageName  // package -> the package name in the manifest file of main module
-        projectDescription.debug_package = project.android.defaultConfig.applicationId  // applicationId -> debug_package
+        projectDescription.package = packageName
+        // package -> the package name in the manifest file of main module
+        projectDescription.debug_package = project.android.defaultConfig.applicationId
+        // applicationId -> debug_package
         projectDescription.main_manifest_path = project.android.sourceSets.main.manifest.srcFile.path
         projectDescription.launcher = launcher
         projectDescription.apk_path = apkPath
@@ -66,7 +69,7 @@ class FreelineInitializer {
         projectDescription.use_system_gradle = useSystemGradle
 
         def useMd5PathArray = [];
-        for(String path : checkSourcesMd5){
+        for (String path : checkSourcesMd5) {
             useMd5PathArray.add(FreelineUtils.joinPath(project.rootDir.absolutePath, path))
         }
         projectDescription.check_sources_md5 = useMd5PathArray
@@ -153,7 +156,7 @@ class FreelineInitializer {
             def pro = allProjectMap.get(product.name)
             def sourceSets = createSourceSets(pro, product.flavor, product.buildType)
             project_source_sets[pro.name] = sourceSets
-            modules.add(['name': pro.name, 'path': pro.projectDir.absolutePath, 'flavor':product.flavor, 'buildType': product.buildType])
+            modules.add(['name': pro.name, 'path': pro.projectDir.absolutePath, 'flavor': product.flavor, 'buildType': product.buildType])
         }
 
         def mainAppSourceSets = project_source_sets[project.name];
@@ -373,7 +376,7 @@ class FreelineInitializer {
         if (android != null && android.hasProperty("libraryVariants")) {
             android.libraryVariants.each { bv ->
                 if (bv.getName().equalsIgnoreCase(favorBuildType)) {
-                    deps.add(new ProjectProductInfo("android", dependencyProject.name, bv.flavorName , bv.buildType.name))
+                    deps.add(new ProjectProductInfo("android", dependencyProject.name, bv.flavorName, bv.buildType.name))
                     handleAndroidProject(dependencyProject, allProjectMap, bv.flavorName as String, bv.buildType.name as String, moduleDependencies);
                     return;
                 }

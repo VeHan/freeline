@@ -10,7 +10,8 @@ public class ExportDataBindingInfo {
     public static void run(File sdkDirectory, File outputDirectory) {
         // dataBindingExportBuildInfo
         // TODO: exportClassListTo
-        DataBindingHelper.getLayoutXmlProcessor().writeInfoClass(sdkDirectory, outputDirectory, null, true, true);
+        DataBindingHelper.getLayoutXmlProcessor().writeEmptyInfoClass();
+        //        DataBindingHelper.getLayoutXmlProcessor().writeInfoClass(sdkDirectory, outputDirectory, null, true, true);
     }
 
 }

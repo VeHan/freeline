@@ -1,4 +1,4 @@
-  japply plugin: 'com.jfrog.bintray'
+apply plugin: 'com.jfrog.bintray'
 apply plugin: 'maven'
 
 def mavenDesc = 'Freeline is an incremental build tool for Android platform.'
@@ -62,12 +62,13 @@ Properties properties = new Properties()
 properties.load(project.rootProject.file('local.properties').newDataInputStream())
 
 bintray {
+    override = true
     user = properties.getProperty("bintray.user")
     key = properties.getProperty("bintray.apikey")
 
     configurations = ['archives']
     pkg {
-        repo = 'maven'
+        repo = 'github'
         name = libraryName
         desc = mavenDesc
         websiteUrl = siteUrl

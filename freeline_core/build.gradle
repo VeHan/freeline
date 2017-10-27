@@ -1,14 +1,22 @@
-task packageFreeLinePy(type: Zip) {
-    from("../freeline.py") {
-        into "freeline"
+apply plugin: 'distribution'
+apply from: 'bintray.gradle'
+
+group 'com.veyhey.freeline'
+version FREELINE_RELEASE_VERSION
+
+distributions {
+    main {
+        baseName = "freeline"
+        contents {
+            from("../freeline.py") {
+            }
+            from("./") {
+                into "freeline_core"
+                include "*.py"
+            }
+            from("../release-tools") {
+                into "release-tools"
+            }
+        }
     }
-    from("./") {
-        into "freeline/freeline_core"
-    }
-    from("../release-tools") {
-        into "freeline/release-tools"
-    }
-    include "**.py"
-    archiveName 'freeline.zip'
-    destinationDir = file("./build")
 }

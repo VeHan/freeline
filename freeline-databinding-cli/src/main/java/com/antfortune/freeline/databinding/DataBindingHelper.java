@@ -14,11 +14,10 @@ public class DataBindingHelper {
 
     public static void init(String packageName, int minSdkVersion, String classOutputPath, boolean isLibrary) {
         if (sLayoutXmlProcessor == null) {
+
             sLayoutXmlProcessor = new LayoutXmlProcessor(
                     packageName,
                     new DataBindingBuilder().createJavaFileWriter(new File(classOutputPath)),
-                    minSdkVersion,
-                    isLibrary,
                     new LayoutXmlProcessor.OriginalFileLookup() {
                         @Override
                         public File getOriginalFileFor(File file) {

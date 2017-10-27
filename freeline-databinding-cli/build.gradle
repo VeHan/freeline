@@ -5,12 +5,12 @@ apply plugin: 'java'
 
 sourceCompatibility = 1.7
 
-def compilerVersion = '2.1.3'
+def compilerVersion = '2.3.3'
 def cliJarName = 'databinding-cli.jar'
 
 def isBuildForJdk8 = hasProperty("jdk8")
 if (isBuildForJdk8) {
-    compilerVersion = '2.2.0'
+    compilerVersion = '2.3.3'
     cliJarName = 'databinding-cli8.jar'
 }
 

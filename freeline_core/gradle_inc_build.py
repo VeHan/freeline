@@ -515,6 +515,15 @@ class GradleIncBuildInvoker(android_tools.AndroidIncBuildInvoker):
                     content = android_tools.fix_unicode_parse_error(get_file_content(main_r_path), main_r_path)
                     write_file_content(main_r_path, content)
 
+    def find_all_dependent_modules(self, module):
+        result = []
+        for dependent in self._all_module_info[module]['local_module_dep']:
+            result.append(dependent)
+            subDependent = self.find_all_dependent_modules(dependent)
+            if len(subDependent) > 0:
+                result.extend(subDependent)
+        return result
+
     def fill_classpaths(self):
         # classpaths:
         # 1. patch classes
@@ -525,7 +534,8 @@ class GradleIncBuildInvoker(android_tools.AndroidIncBuildInvoker):
         patch_classes_cache_dir = self._finder.get_patch_classes_cache_dir()
         self._classpaths.append(patch_classes_cache_dir)
         self._classpaths.append(self._finder.get_dst_classes_dir())
-        for module in self._module_info['local_module_dep']:
+
+        for module in self.find_all_dependent_modules(self._name):
             finder = GradleDirectoryFinder(module, self._module_dir_map[module], self._cache_dir)
             self._classpaths.append(finder.get_patch_classes_cache_dir())
 

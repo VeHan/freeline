@@ -39,7 +39,7 @@ class FreelinePlugin implements Plugin<Project> {
         }
 
         project.rootProject.task("initFreeline") << {
-            FreelineInitializer.initFreeline(project)
+            FreelineInitializer.initFreeline(project, freelineVersion)
         }
 
         project.rootProject.task("checkBeforeCleanBuild") << {
@@ -681,7 +681,7 @@ class FreelinePlugin implements Plugin<Project> {
             javaCompile = variant.hasProperty('javaCompiler') ? variant.javaCompiler : variant.javaCompile
         } else {
             pro.android.libraryVariants.each { libraryVariant ->
-                if ("release".equalsIgnoreCase(libraryVariant.buildType.name as String)) {
+                if ("debug".equalsIgnoreCase(libraryVariant.buildType.name as String)) {
                     javaCompile = libraryVariant.hasProperty('javaCompiler') ? libraryVariant.javaCompiler : libraryVariant.javaCompile
                     return false
                 }
@@ -723,7 +723,10 @@ class FreelinePlugin implements Plugin<Project> {
                 if (project.plugins.hasPlugin("com.android.application")) {
                     aptOutputDir = new File(project.buildDir, "generated/source/apt/${variant.dirName}").absolutePath
                 } else {
-                    aptOutputDir = new File(project.buildDir, "generated/source/apt/release").absolutePath
+                    def flavorName = javaCompile.name.replace("compile", "");
+                    flavorName = flavorName.replace("JavaWithJavac", "");
+                    flavorName = flavorName.replace("Debug", "").toLowerCase();
+                    aptOutputDir = new File(project.buildDir, "generated/source/apt/$flavorName/debug").absolutePath
                 }
 
                 def configurations = javaCompile.classpath

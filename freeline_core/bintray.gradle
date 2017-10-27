@@ -1,0 +1,42 @@
+apply plugin: 'com.jfrog.bintray'
+apply plugin: 'maven'
+
+def mavenDesc = 'Freeline is an incremental build tool for Android platform.'
+def siteUrl = 'https://github.com/alibaba/freeline'
+def gitUrl = 'https://github.com/alibaba/freeline'
+def issueUrl = 'https://github.com/alibaba/freeline/issues'
+
+def licenseIds = ['BSD']
+
+
+def libraryName = 'freeline'
+
+
+
+// Bintray
+Properties properties = new Properties()
+try {
+    properties.load(project.rootProject.file('local.properties').newDataInputStream())
+} catch(Exception e) {
+    // nothing
+}
+
+bintray {
+    override = true
+    user = properties.getProperty("bintray.user")
+    key = properties.getProperty("bintray.apikey")
+
+    configurations = ['archives']
+    pkg {
+        repo = 'github'
+        name = libraryName
+        desc = mavenDesc
+        websiteUrl = siteUrl
+        issueTrackerUrl = issueUrl
+        vcsUrl = gitUrl
+        labels = ['android', 'incremental build', 'freeline', 'hotpatch']
+        licenses = licenseIds
+        publish = true
+        publicDownloadNumbers = true
+    }
+}
