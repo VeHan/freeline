@@ -9,6 +9,7 @@ import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.artifacts.Configuration
 import org.gradle.api.artifacts.Dependency
+import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.util.VersionNumber
 
 /**
@@ -16,7 +17,7 @@ import org.gradle.util.VersionNumber
  */
 class FreelinePlugin implements Plugin<Project> {
 
-    String freelineVersion = "0.8.8"
+    String freelineVersion = "0.8.10"
 
 
     @Override
@@ -213,7 +214,7 @@ class FreelinePlugin implements Plugin<Project> {
                         }
 
                         // find apt config
-                        findAptConfig(pro, variant, projectAptConfig)
+                        findAptConfig(pro, variant, projectAptConfig, extension)
                     }
 
                     // find retrolambda config
@@ -690,8 +691,40 @@ class FreelinePlugin implements Plugin<Project> {
         return javaCompile
     }
 
-    private static def findAptConfig(Project project, def variant, def projectAptConfig) {
-        def javaCompile = getJavaCompileTask(variant, project)
+    private static def getJavaCompileTask(def variant, Project pro, def flavorName) {
+        def javaCompile
+        if (pro.plugins.hasPlugin("com.android.application")) {
+            javaCompile = variant.hasProperty('javaCompiler') ? variant.javaCompiler : variant.javaCompile
+        } else {
+            pro.android.libraryVariants.each { libraryVariant ->
+                if ("debug".equalsIgnoreCase(libraryVariant.buildType.name as String)
+                        && flavorName.equalsIgnoreCase(libraryVariant.flavorName as String)) {
+                    javaCompile = libraryVariant.hasProperty('javaCompiler') ? libraryVariant.javaCompiler : libraryVariant.javaCompile
+                    return false
+                }
+            }
+        }
+        return javaCompile
+    }
+
+    private static def findAptConfig(Project project,
+                                     def variant, def projectAptConfig, def freelineExtension) {
+        if (project.plugins.hasPlugin("com.android.application")) {
+            findAptConfig(project, variant, projectAptConfig, freelineExtension, variant.flavorName)
+        } else {
+            project.android.libraryVariants.each { libraryVariant ->
+                if ("debug".equalsIgnoreCase(libraryVariant.buildType.name as String)) {
+                    findAptConfig(project, variant, projectAptConfig, freelineExtension, libraryVariant.flavorName)
+                }
+            }
+        }
+
+    }
+
+    private static def findAptConfig(Project project,
+                                     def variant,
+                                     def projectAptConfig, def freelineExtension, def flavorName) {
+        def javaCompile = getJavaCompileTask(variant, project, flavorName)
 
         def aptConfiguration = project.configurations.findByName("apt")
         def isAptEnabled = project.plugins.hasPlugin("android-apt") && aptConfiguration != null && !aptConfiguration.empty
@@ -716,6 +749,8 @@ class FreelinePlugin implements Plugin<Project> {
         def isAnnotationProcessor = annotationProcessorConfig != null && !annotationProcessorConfig.empty
 
         if ((isAptEnabled || isAnnotationProcessor) && javaCompile) {
+
+            def annotationProcessorPaths = handleForceAnnotaionProcessor(annotationProcessorConfig, javaCompile, project, freelineExtension)
             println "Freeline found ${project.name} apt plugin enabled."
             javaCompile.outputs.upToDateWhen { false }
             javaCompile.doFirst {
@@ -723,9 +758,6 @@ class FreelinePlugin implements Plugin<Project> {
                 if (project.plugins.hasPlugin("com.android.application")) {
                     aptOutputDir = new File(project.buildDir, "generated/source/apt/${variant.dirName}").absolutePath
                 } else {
-                    def flavorName = javaCompile.name.replace("compile", "");
-                    flavorName = flavorName.replace("JavaWithJavac", "");
-                    flavorName = flavorName.replace("Debug", "").toLowerCase();
                     aptOutputDir = new File(project.buildDir, "generated/source/apt/$flavorName/debug").absolutePath
                 }
 
@@ -738,6 +770,16 @@ class FreelinePlugin implements Plugin<Project> {
                 }
 
                 def processorPath = configurations.asPath
+
+                // remove force annotation processor path for hack
+                for (int j = 0; j < annotationProcessorPaths.size(); j++) {
+                    def path = annotationProcessorPaths.get(j);
+                    if (processorPath.contains(":" + path)) {
+                        processorPath = processorPath.replace(":" + path, "");
+                    } else if (processorPath.contains(path + ":")) {
+                        processorPath = processorPath.replace(path + ":", "");
+                    }
+                }
 
                 boolean disableDiscovery = javaCompile.options.compilerArgs.indexOf('-processorpath') == -1
 
@@ -765,6 +807,51 @@ class FreelinePlugin implements Plugin<Project> {
         } else {
             println "Freeline doesn't found apt plugin for $project.name"
         }
+    }
+
+    private static def getArgText(String name, String value) {
+        return String.format("-A%s=%s", name, value);
+    }
+
+    private static
+    def handleForceAnnotaionProcessor(Configuration annotationProcessorConfig, javaCompile, Project project, FreelineExtension freelineExtension) {
+        def annotationProcessorPaths = [];
+        def annotationProcessors = freelineExtension.forceAnnotationProcessors
+        def dependencies = annotationProcessorConfig.allDependencies
+        dependencies.each {
+            def fullName = "${it.group}:${it.name}:${it.version}";
+            if (annotationProcessors.contains(fullName.toString())) {
+                def files = annotationProcessorConfig.files(it);
+                annotationProcessorPaths.addAll(files.collect { it.absolutePath })
+            }
+        }
+        // remove force annotationProcessorPaths from compile args for hack
+        def args = javaCompile.options.compilerArgs
+        for (int i = 0; i < args.size(); i++) {
+            def arg = args.get(i);
+            if (arg != "-processorpath") {
+                continue;
+            } else {
+                i++;
+                arg = args.get(i);
+            }
+            for (int j = 0; j < annotationProcessorPaths.size(); j++) {
+                def path = annotationProcessorPaths.get(j);
+                if (arg.contains(":" + path)) {
+                    arg = arg.replace(":" + path, "");
+                } else if (arg.contains(path + ":")) {
+                    arg = arg.replace(path + ":", "");
+                }
+            }
+            args.set(i, arg)
+            break;
+        }
+
+        javaCompile.options.compilerArgs << getArgText("freelineForceAnnotationProcessorsPath", annotationProcessorPaths.join(","))
+        def descriptionPath = FreelineUtils.joinPath(FreelineUtils.getFreelineCacheDir(project.rootDir.absolutePath), Constants.FREELINE_PRO_DESC_FILE_NAME)
+        javaCompile.options.compilerArgs << getArgText("freelineDescription", descriptionPath)
+        javaCompile.options.compilerArgs << getArgText("freelineModule", project.name)
+        return annotationProcessorPaths
     }
 
 }

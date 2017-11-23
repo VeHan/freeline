@@ -8,10 +8,13 @@ import android_tools
 from build_commands import CompileCommand, IncAaptCommand, IncJavacCommand, IncDexCommand
 from builder import IncrementalBuilder, Builder
 from gradle_tools import get_project_info, GradleDirectoryFinder, GradleSyncClient, GradleSyncTask, \
-    GradleCleanCacheTask, GradleMergeDexTask, get_sync_native_file_path, fix_package_name, DataBindingProcessor, \
-    DatabindingDirectoryLookUp, GradleBackupIncProductTask, GradleCheckMobileChangeTask, GradlePushHistoryIncTask
+    GradleCleanCacheTask, GradleMergeDexTask, get_sync_native_file_path, fix_package_name, \
+    DataBindingProcessor, \
+    DatabindingDirectoryLookUp, GradleBackupIncProductTask, GradleCheckMobileChangeTask, \
+    GradlePushHistoryIncTask
 from task import find_root_tasks, find_last_tasks, Task
-from utils import get_file_content, write_file_content, is_windows_system, cexec, load_json_cache, get_md5, \
+from utils import get_file_content, write_file_content, is_windows_system, cexec, load_json_cache, \
+    get_md5, \
     write_json_cache
 from tracing import Tracing
 from exceptions import FreelineException
@@ -19,7 +22,8 @@ from exceptions import FreelineException
 
 class GradleIncBuilder(IncrementalBuilder):
     def __init__(self, changed_files, config, task_engine, project_info=None):
-        IncrementalBuilder.__init__(self, changed_files, config, task_engine, builder_name="gradle_inc_builder")
+        IncrementalBuilder.__init__(self, changed_files, config, task_engine,
+                                    builder_name="gradle_inc_builder")
         self._project_info = project_info
         self._tasks_dictionary = {}
         self._module_dependencies = {}
@@ -42,7 +46,8 @@ class GradleIncBuilder(IncrementalBuilder):
         for key, value in self._project_info.iteritems():
             self._module_dependencies[key] = [item for item in value['local_module_dep']]
 
-        self._is_art = android_tools.get_device_sdk_version_by_adb(Builder.get_adb(self._config)) > 20
+        self._is_art = android_tools.get_device_sdk_version_by_adb(
+            Builder.get_adb(self._config)) > 20
         # merge all resources modified files to main resources
         self.__merge_res_files()
         self.__merge_native_files()
@@ -53,7 +58,8 @@ class GradleIncBuilder(IncrementalBuilder):
         :return: None
         """
         for module in self._all_modules:
-            task = android_tools.AndroidIncrementalBuildTask(module, self.__setup_inc_command(module))
+            task = android_tools.AndroidIncrementalBuildTask(module,
+                                                             self.__setup_inc_command(module))
             self._tasks_dictionary[module] = task
 
         for module in self._all_modules:
@@ -66,8 +72,10 @@ class GradleIncBuilder(IncrementalBuilder):
 
     def __setup_invoker(self, module):
         return GradleIncBuildInvoker(module, self._project_info[module]['path'], self._config,
-                                     self._changed_files['projects'][module], self._project_info[module], self._is_art,
-                                     all_module_info=self._project_info, module_dir_map=self._module_dir_map,
+                                     self._changed_files['projects'][module],
+                                     self._project_info[module], self._is_art,
+                                     all_module_info=self._project_info,
+                                     module_dir_map=self._module_dir_map,
                                      is_any_modules_have_res_changed=self._has_res_changed,
                                      changed_modules=self._changed_modules)
 
@@ -92,7 +100,8 @@ class GradleIncBuilder(IncrementalBuilder):
 
         if len(so_files) > 0:
             from zipfile import ZipFile
-            with ZipFile(get_sync_native_file_path(self._config['build_cache_dir']), "w") as nativeZip:
+            with ZipFile(get_sync_native_file_path(self._config['build_cache_dir']),
+                         "w") as nativeZip:
                 for m in range(len(so_files)):
                     nativeZip.write(so_files[m])
 
@@ -111,7 +120,8 @@ class GradleIncBuilder(IncrementalBuilder):
         return modules
 
     def incremental_build(self):
-        merge_dex_task = GradleMergeDexTask(self._config['build_cache_dir'], self._all_modules, self._project_info)
+        merge_dex_task = GradleMergeDexTask(self._config['build_cache_dir'], self._all_modules,
+                                            self._project_info)
         aapt_task = GradleAaptTask(self.__setup_invoker(self._config['main_project_name']),
                                    self._original_changed_files, self._changed_files)
 
@@ -122,16 +132,21 @@ class GradleIncBuilder(IncrementalBuilder):
             aapt_task.add_child_task(rtask)
 
         clean_cache_task = GradleCleanCacheTask(self._config['build_cache_dir'], self._project_info)
-        sync_client = GradleSyncClient(self._is_art, self._config, self._project_info, self._all_modules)
+        sync_client = GradleSyncClient(self._is_art, self._config, self._project_info,
+                                       self._all_modules)
         connect_task = android_tools.ConnectDeviceTask(sync_client)
         sync_task = GradleSyncTask(sync_client, self._config['build_cache_dir'])
-        update_stat_task = android_tools.UpdateStatTask(self._config, self._changed_files['projects'])
+        update_stat_task = android_tools.UpdateStatTask(self._config,
+                                                        self._changed_files['projects'])
 
-        backup_inc_product_task = GradleBackupIncProductTask(self._config, self._config["build_cache_dir"],
-                                                        self._all_modules, self._project_info)
-        check_mobile_change_task = GradleCheckMobileChangeTask(sync_client, self._config["build_cache_dir"],
-                                                          self._config)
-        push_inc_product_task = GradlePushHistoryIncTask(sync_client, self._config["build_cache_dir"],
+        backup_inc_product_task = GradleBackupIncProductTask(self._config,
+                                                             self._config["build_cache_dir"],
+                                                             self._all_modules, self._project_info)
+        check_mobile_change_task = GradleCheckMobileChangeTask(sync_client,
+                                                               self._config["build_cache_dir"],
+                                                               self._config)
+        push_inc_product_task = GradlePushHistoryIncTask(sync_client,
+                                                         self._config["build_cache_dir"],
                                                          self._config)
 
         map(lambda task: task.add_child_task(merge_dex_task), last_tasks)
@@ -251,9 +266,11 @@ class GradleIncDexCommand(IncDexCommand):
 
 
 class GradleIncBuildInvoker(android_tools.AndroidIncBuildInvoker):
-    def __init__(self, module_name, path, config, changed_files, module_info, is_art, all_module_info=None,
+    def __init__(self, module_name, path, config, changed_files, module_info, is_art,
+                 all_module_info=None,
                  module_dir_map=None, is_any_modules_have_res_changed=False, changed_modules=None):
-        android_tools.AndroidIncBuildInvoker.__init__(self, module_name, path, config, changed_files, module_info,
+        android_tools.AndroidIncBuildInvoker.__init__(self, module_name, path, config,
+                                                      changed_files, module_info,
                                                       is_art=is_art)
         self._all_module_info = all_module_info
         self._module_dir_map = module_dir_map
@@ -262,20 +279,29 @@ class GradleIncBuildInvoker(android_tools.AndroidIncBuildInvoker):
         self._merged_res_paths = []
         self._merged_res_paths.append(self._finder.get_backup_res_dir())
         self._replace_mapper = {}
-        self._is_retrolambda_enabled = 'retrolambda' in self._config and self._name in self._config['retrolambda'] \
+        self._is_retrolambda_enabled = 'retrolambda' in self._config and self._name in self._config[
+            'retrolambda'] \
                                        and self._config['retrolambda'][self._name]['enabled']
-        self._is_databinding_enabled = 'databinding_modules' in self._config and self._name in self._config[
-            'databinding_modules']
-        self._is_dagger_enabled = 'apt_libraries' in self._config and self._config['apt_libraries']['dagger']
+        self._is_databinding_enabled = 'databinding_modules' in self._config and self._name in \
+                                                                                 self._config[
+                                                                                     'databinding_modules']
+        self._is_dagger_enabled = 'apt_libraries' in self._config and self._config['apt_libraries'][
+            'dagger']
         self._apt_output_dir = None
+        self._force_annotation_processor_files = load_json_cache(
+            os.path.join(self._config['build_cache_dir'], "freeline-force-apt", module_name,
+                         'force_annotation_processor_files.json'))
         for mname in self._all_module_info.keys():
             if mname in self._config['project_source_sets']:
-                self._merged_res_paths.extend(self._config['project_source_sets'][mname]['main_res_directory'])
-                self._merged_res_paths.extend(self._config['project_source_sets'][mname]['main_assets_directory'])
+                self._merged_res_paths.extend(
+                    self._config['project_source_sets'][mname]['main_res_directory'])
+                self._merged_res_paths.extend(
+                    self._config['project_source_sets'][mname]['main_assets_directory'])
 
     def before_execute(self):
         self._finder = GradleDirectoryFinder(self._name, self._module_path, self._cache_dir,
-                                             package_name=self._module_info['packagename'], config=self._config)
+                                             package_name=self._module_info['packagename'],
+                                             config=self._config)
 
     def check_res_task(self):
         if self._name != self._config['main_project_name']:
@@ -298,13 +324,15 @@ class GradleIncBuildInvoker(android_tools.AndroidIncBuildInvoker):
             for module_config in databinding_config:
                 module_name = module_config['name']
                 if module_name in original_changed_files['projects']:
-                    resources_files = original_changed_files['projects'][module_config['name']]['res']
+                    resources_files = original_changed_files['projects'][module_config['name']][
+                        'res']
                     if len(resources_files) == 0:
                         self.debug('module {} has no resources files changed'.format(module_name))
                         continue
 
                     changed_files_map = {}
-                    res_dirs = self._config['project_source_sets'][module_name]['main_res_directory']
+                    res_dirs = self._config['project_source_sets'][module_name][
+                        'main_res_directory']
                     # TODO: detect matches missing issue
                     for path in resources_files:
                         for rdir in res_dirs:
@@ -318,17 +346,21 @@ class GradleIncBuildInvoker(android_tools.AndroidIncBuildInvoker):
                     for rdir in changed_files_map.keys():
                         output_res_dir = DatabindingDirectoryLookUp.find_target_res_path(rdir)
                         output_java_dir = DatabindingDirectoryLookUp.find_target_java_path(rdir)
-                        output_layoutinfo_dir = DatabindingDirectoryLookUp.get_merged_layoutinfo_dir(self._cache_dir)
+                        output_layoutinfo_dir = DatabindingDirectoryLookUp.get_merged_layoutinfo_dir(
+                            self._cache_dir)
                         if output_res_dir and output_java_dir and output_layoutinfo_dir:
                             changed_files_list = changed_files_map[rdir]
-                            procossor.process_module_databinding(module_config, rdir, output_res_dir,
-                                                                 output_layoutinfo_dir, output_java_dir,
+                            procossor.process_module_databinding(module_config, rdir,
+                                                                 output_res_dir,
+                                                                 output_layoutinfo_dir,
+                                                                 output_java_dir,
                                                                  self._config['sdk_directory'],
                                                                  changed_files=changed_files_list)
                             # replace file path
                             for path in changed_files_list:
                                 new_path = path.replace(rdir, output_res_dir)
-                                self._merged_res_paths.append(output_res_dir)  # append new path prefix
+                                self._merged_res_paths.append(
+                                    output_res_dir)  # append new path prefix
                                 self.debug('replace {} with output path: {}'.format(path, new_path))
                                 self._replace_mapper[new_path] = path
                                 self._changed_files['res'].remove(path)
@@ -343,22 +375,28 @@ class GradleIncBuildInvoker(android_tools.AndroidIncBuildInvoker):
                                         break
 
                                 if has_layoutinfo:
-                                    info_file = os.path.join(output_java_dir, 'android', 'databinding', 'layouts',
+                                    info_file = os.path.join(output_java_dir, 'android',
+                                                             'databinding', 'layouts',
                                                              'DataBindingInfo.java')
                                     if os.path.exists(info_file):
                                         append_files = [info_file]
-                                        append_files.extend(procossor.extract_related_java_files(module_name,
-                                                                                                 output_layoutinfo_dir))
+                                        append_files.extend(
+                                            procossor.extract_related_java_files(module_name,
+                                                                                 output_layoutinfo_dir))
 
                                         if 'apt' not in changed_files_ref['projects'][module_name]:
                                             changed_files_ref['projects'][module_name]['apt'] = []
 
                                         for fpath in append_files:
-                                            self.debug('add {} to {} module'.format(fpath, module_name))
-                                            changed_files_ref['projects'][module_name]['apt'].append(fpath)
+                                            self.debug(
+                                                'add {} to {} module'.format(fpath, module_name))
+                                            changed_files_ref['projects'][module_name][
+                                                'apt'].append(fpath)
 
-                                        if not android_tools.is_src_changed(self._config['build_cache_dir']):
-                                            android_tools.mark_src_changed(self._config['build_cache_dir'])
+                                        if not android_tools.is_src_changed(
+                                                self._config['build_cache_dir']):
+                                            android_tools.mark_src_changed(
+                                                self._config['build_cache_dir'])
 
     def _get_aapt_args(self):
         aapt_args = [self._aapt, 'package', '-f', '-I',
@@ -380,7 +418,8 @@ class GradleIncBuildInvoker(android_tools.AndroidIncBuildInvoker):
                 aapt_args.append('-S')
                 aapt_args.append(resdir)
 
-        if 'extra_dep_res_paths' in self._config and self._config['extra_dep_res_paths'] is not None:
+        if 'extra_dep_res_paths' in self._config and self._config[
+            'extra_dep_res_paths'] is not None:
             arr = self._config['extra_dep_res_paths']
             for path in arr:
                 path = path.strip()
@@ -442,7 +481,8 @@ class GradleIncBuildInvoker(android_tools.AndroidIncBuildInvoker):
         aapt_args.append('--ignore-assets')
         aapt_args.append('public_id.xml:public.xml:*.bak:.*')
 
-        if 'ignore_resource_ids' in self._config and len(self._config['ignore_resource_ids']) > 0 and not is_windows_system():
+        if 'ignore_resource_ids' in self._config and len(
+                self._config['ignore_resource_ids']) > 0 and not is_windows_system():
             aapt_args.append('--ignore-ids')
             aapt_args.append(':'.join(self._config['ignore_resource_ids']))
 
@@ -463,7 +503,8 @@ class GradleIncBuildInvoker(android_tools.AndroidIncBuildInvoker):
                 self.__modify_main_r()
 
                 for module in changed_modules:
-                    fpath = self.__modify_other_modules_r(self._all_module_info[module]['packagename'])
+                    fpath = self.__modify_other_modules_r(
+                        self._all_module_info[module]['packagename'])
                     self.debug('modify {}'.format(fpath))
 
     def __modify_main_r(self):
@@ -487,7 +528,8 @@ class GradleIncBuildInvoker(android_tools.AndroidIncBuildInvoker):
     def append_r_file(self):
         if self._name != self._config['main_project_name']:
             backupdir = self.__get_freeline_backup_r_dir()
-            main_r_path = os.path.join(backupdir, self._config['package'].replace('.', os.sep), 'R.java')
+            main_r_path = os.path.join(backupdir, self._config['package'].replace('.', os.sep),
+                                       'R.java')
 
             # main_r_path existence means that resource modification exists, so that need to add R.java to classpath
             if os.path.exists(main_r_path):
@@ -510,9 +552,11 @@ class GradleIncBuildInvoker(android_tools.AndroidIncBuildInvoker):
         else:
             if is_windows_system():
                 main_r_path = os.path.join(self._finder.get_backup_dir(),
-                                           self._module_info['packagename'].replace('.', os.sep), 'R.java')
+                                           self._module_info['packagename'].replace('.', os.sep),
+                                           'R.java')
                 if os.path.exists(main_r_path):
-                    content = android_tools.fix_unicode_parse_error(get_file_content(main_r_path), main_r_path)
+                    content = android_tools.fix_unicode_parse_error(get_file_content(main_r_path),
+                                                                    main_r_path)
                     write_file_content(main_r_path, content)
 
     def find_all_dependent_modules(self, module):
@@ -542,7 +586,8 @@ class GradleIncBuildInvoker(android_tools.AndroidIncBuildInvoker):
         # add main module classes dir to classpath to generate databinding files
         main_module_name = self._config['main_project_name']
         if self._name != main_module_name and self._is_databinding_enabled:
-            finder = GradleDirectoryFinder(main_module_name, self._module_dir_map[main_module_name], self._cache_dir,
+            finder = GradleDirectoryFinder(main_module_name, self._module_dir_map[main_module_name],
+                                           self._cache_dir,
                                            config=self._config)
             self._classpaths.append(finder.get_dst_classes_dir())
 
@@ -555,7 +600,8 @@ class GradleIncBuildInvoker(android_tools.AndroidIncBuildInvoker):
             for fn in files:
                 if self._is_r_file_changed and self._module_info['packagename'] + '.R.' in fn:
                     android_tools.delete_class(dirpath, fn.replace('.class', ''))
-                if fn.endswith('.class') and '$' not in fn and 'R.' not in fn and 'Manifest.' not in fn:
+                if fn.endswith(
+                        '.class') and '$' not in fn and 'R.' not in fn and 'Manifest.' not in fn:
                     cp = os.path.join(dirpath, fn)
                     java_src = cp.replace('.class', '.java').split('classes' + os.path.sep)[1]
                     existence = True
@@ -567,7 +613,8 @@ class GradleIncBuildInvoker(android_tools.AndroidIncBuildInvoker):
                         android_tools.delete_class(dirpath, fn.replace('.class', ''))
 
     def fill_extra_javac_args(self):
-        if 'apt' in self._config and self._name in self._config['apt'] and self._config['apt'][self._name]['enabled']:
+        if 'apt' in self._config and self._name in self._config['apt'] and \
+                self._config['apt'][self._name]['enabled']:
             apt_config = self._config['apt'][self._name]
             self._apt_output_dir = apt_config['aptOutput']
             apt_args = ['-s', apt_config['aptOutput']]
@@ -584,20 +631,24 @@ class GradleIncBuildInvoker(android_tools.AndroidIncBuildInvoker):
             self._extra_javac_args.extend(apt_args)
         elif self._is_databinding_enabled:
             if self._name == self._config['main_project_name']:
-                apt_output = os.path.join(self._config['build_directory'], 'generated', 'source', 'apt',
+                apt_output = os.path.join(self._config['build_directory'], 'generated', 'source',
+                                          'apt',
                                           self._config['product_flavor'], 'debug')
             else:
-                apt_output = os.path.join(self._config['build_directory'], 'generated', 'source', 'apt', 'release')
+                apt_output = os.path.join(self._config['build_directory'], 'generated', 'source',
+                                          'apt', 'release')
 
             self._apt_output_dir = apt_output
             if not os.path.exists(apt_output):
                 os.makedirs(apt_output)
 
             if self._config['databinding_compiler_jar'] != '':
-                self.debug('add compiler jar to classpath: {}'.format(self._config['databinding_compiler_jar']))
+                self.debug('add compiler jar to classpath: {}'.format(
+                    self._config['databinding_compiler_jar']))
                 self._module_info['dep_jar_path'].append(self._config['databinding_compiler_jar'])
 
-            apt_args = ['-s', apt_output, '-processorpath', os.pathsep.join(self._module_info['dep_jar_path'])]
+            apt_args = ['-s', apt_output, '-processorpath',
+                        os.pathsep.join(self._module_info['dep_jar_path'])]
             self._extra_javac_args.extend(apt_args)
 
     def run_apt_only(self):
@@ -610,7 +661,8 @@ class GradleIncBuildInvoker(android_tools.AndroidIncBuildInvoker):
                 raise FreelineException('apt compile failed.', '{}\n{}'.format(output, err))
 
             if self._apt_output_dir and os.path.exists(self._apt_output_dir):
-                apt_cache_path = os.path.join(self._config['build_cache_dir'], 'apt_files_stat_cache.json')
+                apt_cache_path = os.path.join(self._config['build_cache_dir'],
+                                              'apt_files_stat_cache.json')
                 if os.path.exists(apt_cache_path):
                     apt_cache = load_json_cache(apt_cache_path)
                 for dirpath, dirnames, files in os.walk(self._apt_output_dir):
@@ -620,10 +672,13 @@ class GradleIncBuildInvoker(android_tools.AndroidIncBuildInvoker):
                             if fpath in apt_cache[self._name]:
                                 new_md5 = get_md5(fpath)
                                 if new_md5 != apt_cache[self._name][fpath]['md5']:
-                                    self.debug('detect new md5 value, add apt file to change list: {}'.format(fpath))
+                                    self.debug(
+                                        'detect new md5 value, add apt file to change list: {}'.format(
+                                            fpath))
                                     self._changed_files['src'].append(fpath)
                             else:
-                                self.debug('find new apt file, add to change list: {}'.format(fpath))
+                                self.debug(
+                                    'find new apt file, add to change list: {}'.format(fpath))
                                 self._changed_files['src'].append(fpath)
                         else:
                             self.debug('apt cache not found, add to change list: {}'.format(fpath))
@@ -636,18 +691,22 @@ class GradleIncBuildInvoker(android_tools.AndroidIncBuildInvoker):
             self.debug('apt process do not generate new files, ignore javac task.')
             return
 
-        extra_javac_args_enabled = not (self._is_databinding_enabled and self._should_run_databinding_apt())
-        javacargs = self._generate_java_compile_args(extra_javac_args_enabled=extra_javac_args_enabled)
+        extra_javac_args_enabled = not (
+            self._is_databinding_enabled and self._should_run_databinding_apt())
+        javacargs = self._generate_java_compile_args(
+            extra_javac_args_enabled=extra_javac_args_enabled)
 
         self.debug('javac exec: ' + ' '.join(javacargs))
         output, err, code = cexec(javacargs, callback=None)
 
         if code != 0:
-            raise FreelineException('incremental javac compile failed.', '{}\n{}'.format(output, err))
+            raise FreelineException('incremental javac compile failed.',
+                                    '{}\n{}'.format(output, err))
         else:
             if self._is_r_file_changed:
                 old_r_file = self._finder.get_dst_r_path(config=self._config)
-                new_r_file = android_tools.DirectoryFinder.get_r_file_path(self._finder.get_backup_dir())
+                new_r_file = android_tools.DirectoryFinder.get_r_file_path(
+                    self._finder.get_backup_dir())
                 if old_r_file and new_r_file:
                     shutil.copyfile(new_r_file, old_r_file)
                     self.debug('copy {} to {}'.format(new_r_file, old_r_file))
@@ -686,6 +745,8 @@ class GradleIncBuildInvoker(android_tools.AndroidIncBuildInvoker):
                         if file[len(dst_classes_dir):] in path_members_injector:
                             os.remove(file)
             arguments.append(fpath)
+        for fpath in self._force_annotation_processor_files:
+            arguments.append(fpath)
 
         if extra_javac_args_enabled:
             if 'apt' in self._changed_files:
@@ -716,8 +777,10 @@ class GradleIncBuildInvoker(android_tools.AndroidIncBuildInvoker):
         if is_windows_system():
             arguments_length = sum(map(len, arguments))
             if arguments_length > 8000:
-                argument_file_path = os.path.join(self._finder.get_module_cache_dir(), 'javac_args_file')
-                self.debug('arguments length: {} > 8000, save args to {}'.format(arguments_length, argument_file_path))
+                argument_file_path = os.path.join(self._finder.get_module_cache_dir(),
+                                                  'javac_args_file')
+                self.debug('arguments length: {} > 8000, save args to {}'.format(arguments_length,
+                                                                                 argument_file_path))
 
                 if os.path.exists(argument_file_path):
                     os.remove(argument_file_path)
@@ -745,7 +808,8 @@ class GradleIncBuildInvoker(android_tools.AndroidIncBuildInvoker):
                         continue
 
                     for info in files:
-                        if info['module'] == self._name or info['module'] in self._module_info['local_module_dep']:
+                        if info['module'] == self._name or info['module'] in self._module_info[
+                            'local_module_dep']:
                             if 'java_path' in info and info['java_path']:
                                 related_files.append(info['java_path'])
                 write_json_cache(self._get_apt_related_files_cache_path(), related_files)
@@ -777,7 +841,8 @@ class GradleIncBuildInvoker(android_tools.AndroidIncBuildInvoker):
                         '-Dretrolambda.outputDir={}'.format(target_dir)]
 
             if lambda_config['supportIncludeFiles']:
-                files_stat_path = os.path.join(self._cache_dir, self._name, 'lambda_files_stat.json')
+                files_stat_path = os.path.join(self._cache_dir, self._name,
+                                               'lambda_files_stat.json')
 
                 include_files = []
                 if os.path.exists(files_stat_path):
@@ -798,7 +863,8 @@ class GradleIncBuildInvoker(android_tools.AndroidIncBuildInvoker):
 
                 include_files_param = os.pathsep.join(include_files)
                 if len(include_files_param) > 3496:
-                    include_files_path = os.path.join(self._cache_dir, self._name, 'retrolambda_inc.list')
+                    include_files_path = os.path.join(self._cache_dir, self._name,
+                                                      'retrolambda_inc.list')
                     self.__save_parms_to_file(include_files_path, include_files)
                     jar_args.append('-Dretrolambda.includedFile={}'.format(include_files_path))
                 else:
@@ -809,7 +875,8 @@ class GradleIncBuildInvoker(android_tools.AndroidIncBuildInvoker):
             param = os.pathsep.join(lambda_classpaths)
 
             if lambda_config['supportIncludeFiles'] and len(param) > 3496:
-                classpath_file = os.path.join(self._cache_dir, self._name, 'retrolambda_classpaths.path')
+                classpath_file = os.path.join(self._cache_dir, self._name,
+                                              'retrolambda_classpaths.path')
                 self.__save_parms_to_file(classpath_file, lambda_classpaths)
                 jar_args.append('-Dretrolambda.classpathFile={}'.format(classpath_file))
             else:
@@ -844,7 +911,8 @@ class GradleIncBuildInvoker(android_tools.AndroidIncBuildInvoker):
 
     def _get_res_incremental_dst_path(self, fpath):
         if 'assets' + os.sep in fpath:
-            return os.path.join(self._finder.get_base_gen_dir(), 'assets', 'debug', fpath.split('assets' + os.sep)[1])
+            return os.path.join(self._finder.get_base_gen_dir(), 'assets', 'debug',
+                                fpath.split('assets' + os.sep)[1])
         elif 'res' + os.sep in fpath:
             return os.path.join(self._finder.get_res_dir(), fpath.split('res' + os.sep)[1])
 
@@ -890,7 +958,8 @@ class GradleIncBuildInvoker(android_tools.AndroidIncBuildInvoker):
 
         r_path = android_tools.find_r_file(finder.get_dst_r_dir(), package_name=package_name)
         if r_path and os.path.exists(r_path):
-            target_dir = os.path.join(self.__get_freeline_backup_r_dir(), package_name.replace('.', os.sep))
+            target_dir = os.path.join(self.__get_freeline_backup_r_dir(),
+                                      package_name.replace('.', os.sep))
             if not os.path.exists(target_dir):
                 os.makedirs(target_dir)
             target_path = os.path.join(target_dir, 'R.java')
@@ -918,8 +987,9 @@ class GradleIncBuildInvoker(android_tools.AndroidIncBuildInvoker):
 
     @staticmethod
     def remove_final_tag(content):
-        content = content.replace('public final class', 'public class').replace('public static final class',
-                                                                                'public static class')
+        content = content.replace('public final class', 'public class').replace(
+            'public static final class',
+            'public static class')
         return content
 
     @staticmethod

@@ -45,6 +45,8 @@ class FreelineExtension {
 
     boolean forceVersionName = false
 
+    List<String> forceAnnotationProcessors = []
+
     FreelineExtension(Project project) {
     }
 }

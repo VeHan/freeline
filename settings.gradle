@@ -7,8 +7,9 @@
 // include ':freeline-sample:PureJavaLib'
 
 // freeline runtime
-include ':runtime'
+include ':runtime', ':freeline-compiler'
 project(':runtime').projectDir = new File('freeline-runtime')
+project(':freeline-compiler').projectDir = new File('processor')
 include ':runtime-no-op'
 project(':runtime-no-op').projectDir = new File('freeline-runtime-no-op')
 
