@@ -160,7 +160,7 @@ class FreelinePlugin implements Plugin<Project> {
                         output.processManifest.doLast {
                             if (isStudioCanaryVersion) {
 //                            修改了Manifest的获取方式 之前api已被取消 不过根据Manifest的位置相对固定就这样子去访问了
-                                def path = "${project.buildDir}/intermediates/manifests/full/debug/AndroidManifest.xml"
+                                def path = "$manifestOutputDirectory/AndroidManifest.xml"
                                 def manifestFile = new File(path)
                                 if (manifestFile.exists()) {
                                     println "find manifest file path: ${manifestFile.absolutePath}"
@@ -400,13 +400,11 @@ class FreelinePlugin implements Plugin<Project> {
                 }
 
                 if (multiDexEnabled && applicationProxy) {
-                    def mainDexListFile = new File("${project.buildDir}/intermediates/multi-dex/${variant.dirName}/maindexlist.txt")
+                    def manifestKeepFile = new File("${project.buildDir}/intermediates/multi-dex/${variant.dirName}/manifest_keep.txt")
                     if (multiDexListTask) {
                         multiDexListTask.outputs.upToDateWhen { false }
-                        multiDexListTask.doLast {
-                            Constants.FREELINE_CLASSES.each { clazz ->
-                                mainDexListFile << "\n${clazz}"
-                            }
+                        multiDexListTask.doFirst {
+                            manifestKeepFile << "-keep class com.antfortune.freeline.** { *; }"
                         }
                     }
                 }
